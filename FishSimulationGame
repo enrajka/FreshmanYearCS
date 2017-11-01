@@ -1,0 +1,409 @@
+//////////////////// ALL ASSIGNMENTS INCLUDE THIS SECTION /////////////////////
+//
+// Title: SwimSimulation
+// Files:
+// Course:CS300 2017
+//
+// Author:Emilie Rajka
+// Email:erajka@wisc.edu
+// Lecturer's Name:Gary Dahl
+//
+/////////////////////////////// 80 COLUMNS WIDE ///////////////////////////////
+
+public class Main {
+	private static SwimSimulation sim = null;
+	
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+		Utility.startSimulation();
+	}
+	
+	public static void onClick(Data data, int mouseX, int mouseY)
+	{
+		sim.handleClick(mouseX,mouseY);
+	}
+	
+	public static void setup(Data data) {
+		sim = new SwimSimulation(data.processing);
+	}
+
+	public static void update(Data data) {
+		sim.update();
+	}	
+}
+
+class SimObject {
+	protected int x,y;
+	protected static PApplet processing;
+	protected PImage image;
+	protected boolean removeObjects = false;
+	
+	//removal method
+	public boolean shouldBeRemoved() {
+		return removeObjects;
+	}
+	//will initialize the PApplet reference that is used by all SimObjects
+	public static void setProcessing(PApplet data) {
+		processing  = data;
+	}
+	
+	//constructor with no int values
+	public SimObject(String imagePath) { //throws IllegalStateException {
+		if(processing == null) { throw new IllegalStateException("SimObject."
+				+ "setProcessing() must be called before constructing any "
+				+ "SimObjects.");
+			}
+		
+		x = Utility.randomInt(processing.width);
+		y = Utility.randomInt(processing.height);
+		image = processing.loadImage("images" + java.io.File.separator
+					+ imagePath);
+	
+		
+	}
+
+	
+	//constructor with given int values
+	public SimObject(String imagePath, int x, int y) {
+		if(processing != null) {
+			this.x = x;
+			this.y = y;
+			image = processing.loadImage("images" + java.io.File.separator
+					+ imagePath);
+		}
+		else {
+			System.out.println("SimObject.setProcessing() must be called "
+					+ "before constructing any SimObjects.");
+		}
+	}
+	
+
+	//looks at the distance between two objects 
+	public float distanceTo(int x, int y) {
+		double d = Math.sqrt(Math.pow((double)(x - this.x), 2.0) + 
+				Math.pow((double)(y - this.y), 2.0));
+	    float distance = (float) d;
+	    return distance;
+	}
+	
+	//basic update method that is overridden
+	public void update() {}
+	
+	//basic one that is overridden in other classes
+	public void tryToInteract(SimObject other) {}
+}
+
+class SwimSimulation {
+	PApplet processing;
+	ArrayList<SimObject> allObjects = new ArrayList<>();
+	Scanner fin;
+	Scanner fil;
+
+ 
+	public SwimSimulation(PApplet data) {
+		SimObject.setProcessing(data);
+    	processing = data;
+		scanInFile();
+	} 
+	
+	private void scanInFile() { 
+		try {
+			String filePath = "FileOptions.ssf";
+			fin = new Scanner(new File(filePath));
+			String[] possibleFiles = fin.nextLine().split("[;  ]+"); //this makes
+			//array of the possible ssd files		
+			System.out.println(new File(".").getAbsolutePath()); //test that shows
+			//the absolute path 
+			lookATSSD(possibleFiles); //will call to the method that can read the
+			//ssd file 
+		}
+		catch (FileNotFoundException e) { //if the initial ssf file isn't found 
+			//this will run a simulation the has four fish and 6 foods randomly
+			//placed
+			System.out.println("WARNING: Could not find or open the FileOption"
+					+ "s.ssf file");
+			defaultSetup();
+		}
+		
+	}
+	
+  
+	private void lookATSSD(String[] possibleFiles) {
+		String chosenOne = possibleFiles[Utility.randomInt(possibleFiles.length)];
+        chosenOne = chosenOne.trim().replace('\\', File.separatorChar).
+        		replace('/', File.separatorChar);
+        System.out.println(chosenOne);
+        File file = new File(chosenOne);
+        Scanner fil = null;
+        try {
+        	fil = new Scanner(file);
+        	String wholeFile = "";
+        	while (fil.hasNextLine()) {
+    	 		wholeFile += fil.nextLine() + " "; //makes the ssd file into one
+    	 		//string 
+          	}
+        	
+        	String[] valuesInSSDFile = wholeFile.split("[ ,:]+");
+        	putTheItemsOnTheScreen(valuesInSSDFile);
+        	
+        }catch(FileNotFoundException e) { //if ssd file is not found, will 
+        	//automatically make an animation with random positions 
+        	//for fish/food/hook
+           	defaultSetup();
+           	System.out.println("WARNING: Could not find or open " + 
+           			chosenOne + " file");
+    		}
+//        finally {fil.close();}
+	}
+	
+	private void putTheItemsOnTheScreen(String[] ssdInformation) {
+		
+		try {
+			int fishStart = 0, foodStart = 0, fish = 0, food = 0;
+			for(int i = 0; i < ssdInformation.length; i++) {
+				if(ssdInformation[i].equalsIgnoreCase("Fish")) {
+					fish = Integer.parseInt(ssdInformation[i+1]);
+					fishStart = (i+2);
+				}
+				if(ssdInformation[i].equalsIgnoreCase("Food")) {
+					food = Integer.parseInt(ssdInformation[(i+1)]);					
+					foodStart = (i+2);
+				}
+				if(ssdInformation[i].equalsIgnoreCase("Hook")) {
+					allObjects.add(new Hook(Integer.parseInt(ssdInformation[i+2]),
+							Integer.parseInt(ssdInformation[i+3])));
+				}
+				
+				
+			}
+			for(int j = 0; j < fish; j++) {
+				allObjects.add(new Fish(Integer.parseInt(ssdInformation[fishStart++]), 
+						Integer.parseInt(ssdInformation[fishStart++])));
+			}
+			for(int j = 0; j < food; j++) {
+				allObjects.add(new Food(Integer.parseInt(ssdInformation[foodStart++]), 
+						Integer.parseInt(ssdInformation[foodStart++])));
+			}
+	
+		}
+		catch(ArrayIndexOutOfBoundsException e) {
+			System.out.println("WARNING: Missing specification for the number and "
+					+ "intial positions of fishes, foods, or hook.");
+			defaultSetup();
+		}
+	}
+	
+	public void update() {
+		int chance = 5; //random number between 1-100 if this number is chosen then a 
+		//new Food will be added
+		
+		if(Utility.randomInt(100)+1 == chance) {
+			  allObjects.add(new Food(Utility.randomInt(processing.width), 0));
+		  }
+		 
+		SimObject.processing.background(0,255,255);
+		 
+		  for(int i = 0; i < allObjects.size(); i++) {
+			  if(allObjects.get(i).shouldBeRemoved()) {
+				  allObjects.remove(i); //looks at each space in the arraylist and 
+				  //sees if it should be removed
+				  i--;
+			  }
+		  }	
+		
+		  for(int i = 0; i < allObjects.size(); i++) {
+			  allObjects.get(i).update(); //updates all objects in the arraylist 
+		  }
+		
+		  for(int f = 0; f < allObjects.size(); f++) {
+			  if(allObjects.get(f) instanceof Fish) {//f is a Fish 
+				  
+				  for(int g = 0; g < allObjects.size(); g++) {
+					  if(allObjects.get(g) instanceof Hook) { //g is Hook
+						  (allObjects.get(g)).tryToInteract(allObjects.get(f));//if
+						  //f is a fish and g is a hook
+						  //then hook should trytointeract with the fish
+					  }
+				  }
+				  
+				  for(int h = 0; h < allObjects.size(); h++) { //h is Food
+					  if(allObjects.get(h) instanceof Food) {
+						  (allObjects.get(f)).tryToInteract(allObjects.get(h));
+						  //if h is food and f is fish
+						  //the fish should trytointeract with the food
+					  }
+				  }
+				  
+			  }
+		  }
+		  
+		
+	 }
+	 
+	 public void handleClick(int mouseX, int mouseY) {
+	 for(int k = 0; k < allObjects.size(); k++) {
+		 if(allObjects.get(k) instanceof Hook){
+			 ((Hook)allObjects.get(k)).handleClick(mouseX, mouseY);}//casts 
+		 //handleClick method to whichever object is an instance of Hook
+	 	}
+	 }
+	 
+	 public void defaultSetup() { //setup called if scanned in file fails
+		int i = 0, j = 0;
+		while(i < 4) {
+			allObjects.add(new Fish());	
+			i++;
+		}
+		while(j < 6)
+		{
+			allObjects.add(new Food());	
+			j++;
+		}
+		allObjects.add(new Hook());
+	 }	
+}
+
+class Fish extends SimObject{
+	//constructor with no int values 
+	public Fish() {
+		super("FISH.png");
+	}
+	
+	//constructor with given int values
+	public Fish(int x, int y) {
+		super("FISH.png",x,y);
+	}
+	
+	//getter methods for x and y
+	public int getX() {return x;}
+	public int getY() {return y;}
+	
+	//overrides the update() method from SimObjects
+	@Override
+	public void update() {
+		processing.image(image, x, y);
+		if(x + 1 > processing.width) {
+			x = 0;
+		}
+		else {
+			x += 1;
+		}		
+	}
+	
+	//Overrides the method from SimObject and casts the other to food
+	@Override
+	public void tryToInteract(SimObject other) {
+		if(other instanceof Food) {
+		float distance = ((Food)other).distanceTo(x, y);
+		if(distance <= 40) {
+			((Food)other).getEaten();
+		}
+		}
+	}
+	
+	//this method moves the fish from current position to a random y
+	//at the left side of the screen
+	public void getCaught() {
+		x = 0;
+		y = Utility.randomInt(processing.height);
+	}
+	
+}
+
+class Food extends SimObject{
+	//constructor with no int values
+	 public Food() {
+		 super("FOOD.png");
+	 }
+	 
+	 //constructor with given int values
+	 public Food(int x, int y) {
+		super("FOOD.png",x,y);
+	 }
+	 
+	 //getter methods for x and y
+	 public int getX() {return x;}
+	 public int getY() {return y;}
+	 
+	 //overridden update() method from SimObject class
+	 @Override
+	 public void update() {
+	  processing.image(image, x, y);
+	  
+	  if(x - 1 < 0) {
+	   x = (processing.width) - 1;
+	  }
+	  else if(x - 1 > processing.width) {
+	   x = 0;
+	  }
+	  else {
+	   x -= 1;
+	  }
+	 
+	  if(y + 1 < 0) {
+	   y = (processing.height) - 1;
+	  }
+	  else if(y + 1 > processing.height) {
+	   y = 0;
+	  }
+	  else {
+	   y += 1;
+	  }
+	  
+	 }
+	 
+	 //This will replace the food that the fish has eaten with 
+	 //a new food in a random spot
+	 public void getEaten() {
+	  super.removeObjects = true;
+	 }
+	 
+}
+
+class Hook extends SimObject{
+	//constructor with no int values 
+	 public Hook() {
+		 super("HOOK.png");
+	 }
+	//constructor with given int values
+	 public Hook(int x, int y) {
+		 super("HOOK.png",x,y); 
+	 }
+	 //getter methods for x and y
+	 public int getX() {return x;}
+	 public int getY() {return y;}
+	 
+	 //Overridden update() method from SimObject class
+	 @Override
+	 public void update() {
+	  processing.image(image, x, y);
+	  processing.line(x+4,  0, x+4, y - 10);
+	  
+	  if(y - ((processing.height + 50 - y)/50) < 0) {
+	   y = processing.height;
+	  }
+	  else {
+	   y -= ((processing.height + 50 - y)/50);
+	  }  
+	 }
+	 
+	 //handles the user's mouse click and moves the hook to the the
+	 //x coord that the users clicks on 
+	 public void handleClick(int mouseX, int mouseY) {
+	  x = mouseX;
+	  y = processing.height;
+	 }
+	 
+	 //Overrides the method in SimObject that tries to interact
+	 //a fish object with a hook
+	 @Override
+	 public void tryToInteract(SimObject other) {
+		 if(other instanceof Fish) {
+		 float distance = ((Fish)other).distanceTo(x, y);
+		  	if(distance <= 40) {
+		  		((Fish)other).getCaught();
+		  	}
+		  	}
+	 }
+	 
+}
