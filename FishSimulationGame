@@ -1,15 +1,3 @@
-//////////////////// ALL ASSIGNMENTS INCLUDE THIS SECTION /////////////////////
-//
-// Title: SwimSimulation
-// Files:
-// Course:CS300 2017
-//
-// Author:Emilie Rajka
-// Email:erajka@wisc.edu
-// Lecturer's Name:Gary Dahl
-//
-/////////////////////////////// 80 COLUMNS WIDE ///////////////////////////////
-
 public class Main {
 	private static SwimSimulation sim = null;
 	
